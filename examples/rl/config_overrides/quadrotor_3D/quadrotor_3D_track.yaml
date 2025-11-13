@@ -8,20 +8,20 @@ task_config:
   normalized_rl_action_space: True
 
 # reference initial state: 0, 1.25663706, -0.25, -0.37831853, 0.75, 0.87831853, 0.,  0.,  0.,  0., 0., 0.
-  # init_state:
-  #   init_x: 0.4
-  #   init_x_dot: 0
-  #   init_y: 0.4
-  #   init_y_dot: 0
-  #   init_z: 1
-  #   init_z_dot: 0
-  #   init_phi: 0
-  #   init_theta: 0
-  #   init_psi: 0
-  #   init_p: 0
-  #   init_q: 0
-  #   init_r: 0
-  randomized_init: True
+  init_state:
+    init_x: 0
+    init_x_dot: 0
+    init_y: -0.25
+    init_y_dot: 0
+    init_z: 0.75
+    init_z_dot: 0
+    init_phi: 0
+    init_theta: 0
+    init_psi: 0
+    init_p: 0
+    init_q: 0
+    init_r: 0
+  # randomized_init: True
   # randomized_inertial_prop: False
 
   init_state_randomization_info:
@@ -90,7 +90,7 @@ task_config:
     Iyy: 1.4e-5
     Izz: 2.17e-5
 
-  episode_len_sec: 4.5
+  episode_len_sec: 5
   cost: rl_reward
   obs_goal_horizon: 1
 

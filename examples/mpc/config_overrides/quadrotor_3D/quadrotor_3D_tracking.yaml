@@ -8,20 +8,20 @@ task_config:
   # normalized_rl_action_space: True
 
 # reference initial state: 0, 1.25663706, -0.25, -0.37831853, 0.75, 0.87831853, 0.,  0.,  0.,  0., 0., 0.
-  # init_state:
-  #   init_x: 0.4
-  #   init_x_dot: 0
-  #   init_y: 0.4
-  #   init_y_dot: 0
-  #   init_z: 1
-  #   init_z_dot: 0
-  #   init_phi: 0
-  #   init_theta: 0
-  #   init_psi: 0
-  #   init_p: 0
-  #   init_q: 0
-  #   init_r: 0
-  randomized_init: True
+  init_state:
+    init_x: 0
+    init_x_dot: 0
+    init_y: -0.25
+    init_y_dot: 0
+    init_z: 0.75
+    init_z_dot: 0
+    init_phi: 0
+    init_theta: 0
+    init_psi: 0
+    init_p: 0
+    init_q: 0
+    init_r: 0
+  # randomized_init: True
   # randomized_inertial_prop: False
 
   init_state_randomization_info:
@@ -80,7 +80,7 @@ task_config:
     num_cycles: 1
     trajectory_plane: 'xz'
     trajectory_position_offset: [0, 1]
-    trajectory_scale: 0.8
+    trajectory_scale: 1
     proj_point: [0, 0, 0.5]
     proj_normal: [0, 1, 1]
 
@@ -90,7 +90,7 @@ task_config:
     Iyy: 1.4e-5
     Izz: 2.17e-5
 
-  episode_len_sec: 4.5
+  episode_len_sec: 5
   cost: quadratic
   # Match MPC weights
   rew_state_weight: [5.0, 0.1, 5.0, 0.1, 5.0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
@@ -106,12 +106,12 @@ task_config:
         - 1
         - 2
         - 1
-        - 0.2
-        - 0.2
-        - 0.2
-        - 1
-        - 1
-        - 1
+        - 0.7
+        - 0.7
+        - 0.7
+        - 1.5
+        - 1.5
+        - 1.5
       lower_bounds:
         - -2
         - -1
@@ -119,12 +119,12 @@ task_config:
         - -1
         - 0
         - -1
-        - -0.2
-        - -0.2
-        - -0.2
-        - -1
-        - -1
-        - -1
+        - -0.7
+        - -0.7
+        - -0.7
+        - -1.5
+        - -1.5
+        - -1.5
     - constraint_form: default_constraint
       constrained_variable: input
       upper_bounds:

@@ -31,7 +31,7 @@ algo_config:
   use_RTI: True
   with_condensing_terminal_value: True
   second_phase:
-    method: "pept"  # "pept" "clc" "pt" "rl"
+    method: "rl"  # "pept" "clc" "pt" "rl"
     initialization: "shifting"  # "warm_starting" "shifting"
     initialization_pept: "rollout"  # "rollout" "stage_wise"
     barrier_parameter: 1e-2

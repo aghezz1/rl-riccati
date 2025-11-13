@@ -9,11 +9,12 @@ import scipy
 from termcolor import colored
 
 from safe_control_gym.controllers.mpc.mpc import MPC
+from safe_control_gym.controllers.mpc.mpc_acados_m import load_policy_and_convert_to_l4casadi_model
 from safe_control_gym.controllers.mpc.mpc_utils import set_acados_constraint_bound
 from safe_control_gym.utils.utils import timing
 
 try:
-    from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
+    from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSim, AcadosSimSolver
     from acados_template.mpc_utils import detect_constraint_structure
 except ImportError as e:
     print(colored(f'Error: {e}', 'red'))
@@ -92,6 +93,8 @@ class MPC_ACADOS(MPC):
         self.initialization = initialization
         self.use_RTI = use_RTI
         self.ocp_solver_exist = False
+        self.pi_casadi_fn, self.model_l4casadi, self.pytorch_model = load_policy_and_convert_to_l4casadi_model()
+        self.pi_eval = lambda x: self.pi_casadi_fn(x).full().squeeze()
 
     @timing
     def reset(self):
@@ -110,6 +113,10 @@ class MPC_ACADOS(MPC):
             # Acados optimizer.
             self.setup_acados_optimizer()
             self.acados_ocp_solver = AcadosOcpSolver(self.ocp)
+            self.setup_acados_simulator()
+            # Warm start l4casadi
+            [self.acados_ocp_solver.solve() for _ in range(3)]
+            [self.pi_casadi_fn(np.ones(self.acados_model.x.shape[0]*2)) for _ in range(10)]
 
     def setup_acados_model(self) -> AcadosModel:
         '''Sets up symbolic model for acados.
@@ -149,6 +156,18 @@ class MPC_ACADOS(MPC):
         x_val, u_val = super().compute_initial_guess(init_state, goal_states)
         self.x_guess = x_val
         self.u_guess = u_val
+
+    def setup_acados_simulator(self):
+        sim = AcadosSim()
+        sim.model.f_expl_expr = self.model.x_dot
+        sim.model.x = self.model.x_sym
+        sim.model.xdot = cs.MX.sym("xdot", sim.model.x.shape)
+        sim.model.f_impl_expr = sim.model.xdot - sim.model.f_expl_expr
+        sim.model.u = self.model.u_sym
+        sim.model.name = "quadrotor_sim"
+        sim.solver_options.T = self.dt
+        sim.solver_options.integrator_type = 'ERK'
+        self.acados_integrator = AcadosSimSolver(sim)
 
     def setup_acados_optimizer(self):
         '''Sets up nonlinear optimization problem.'''
@@ -225,7 +244,10 @@ class MPC_ACADOS(MPC):
         ocp.solver_options.integrator_type = 'ERK'
         ocp.solver_options.nlp_solver_type = 'SQP' if not self.use_RTI else 'SQP_RTI'
         ocp.solver_options.nlp_solver_max_iter = 100
+        if self.compute_initial_guess_method == "policy":
+            ocp.solver_options.qp_solver_iter_max = 1
         ocp.solver_options.levenberg_marquardt = 1.
+        # ocp.solver_options.print_level = 1
         if not self.use_RTI:
             ocp.solver_options.globalization = 'FUNNEL_L1PEN_LINESEARCH'  # 'MERIT_BACKTRACKING'
         ocp.solver_options.tf = self.T * self.dt  # prediction horizon
@@ -434,6 +456,27 @@ class MPC_ACADOS(MPC):
                         # Else: repeat last control
                     self.acados_ocp_solver.set(i, "u", uk_next)
                 self.acados_ocp_solver.set(self.T, "x", xk_next)
+            if self.compute_initial_guess_method == "policy":
+                if self.initialization == "warm_starting":
+                    xk = self.acados_ocp_solver.get(0, "x")
+                    for i in range(self.T):
+                        uk = self.pi_eval(cs.veccat(xk, goal_states[:, i+1]))
+                        xk_next = self.acados_integrator.simulate(xk, uk)
+                        self.acados_ocp_solver.set(i, "u", uk)
+                        self.acados_ocp_solver.set(i+1, "x", xk_next)
+                        xk = xk_next
+                    # self.acados_ocp_solver.set_flat("x", X_flatten) # TODO
+                elif self.initialization == "shifting":  #TODO check the shifting because the results are terrible in comparison to warm_starting
+                    goal_states = self.get_references()
+                    xk = self.acados_ocp_solver.get(i+1, "x")
+                    self.acados_ocp_solver.set(i, "x", xk)
+                    for i in range(self.T):
+                        uk = self.pi_eval(cs.veccat(xk, goal_states[:, i+1]))
+                        self.acados_ocp_solver.set(i, "u", uk)
+                        # if i < self.T -1 :
+                        xk_next = self.acados_integrator.simulate(xk, uk)
+                        self.acados_ocp_solver.set(i+1, "x", xk_next)
+                        xk = xk_next
 
         # solve the optimization problem
         if self.use_RTI:
@@ -457,6 +500,7 @@ class MPC_ACADOS(MPC):
             status = self.acados_ocp_solver.solve()
             time_tot = self.acados_ocp_solver.get_stats('time_tot')
             self.results_dict['t_wall'].append([time_tot, np.nan, np.nan])
+        self.acados_ocp_solver.print_statistics()
         if status not in [0, 2]:
             self.acados_ocp_solver.print_statistics()
             print(colored(f'acados returned status {status}. Terminating the simulation.', 'red'))

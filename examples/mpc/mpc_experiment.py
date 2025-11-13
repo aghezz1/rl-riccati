@@ -54,7 +54,7 @@ def run(gui=False, plot=True, n_episodes=1, n_steps=None, save_data=False):
     env.close()
 
     if config.algo == 'mpc_acados':
-        filename = f"{datetime.now().strftime('%d_%m')}_trajscal_{config.task_config.task_info.trajectory_scale}_acados_N{config.algo_config.horizon}_RTI_{config.algo_config.use_RTI}_init_{config.algo_config.initialization}"
+        filename = f"{datetime.now().strftime('%d_%m')}_trajscal_{config.task_config.task_info.trajectory_scale}_acados_N{config.algo_config.horizon}_RTI_{config.algo_config.use_RTI}_init_{config.algo_config.initial_guess_t0.initialization_type}_with_{config.algo_config.initialization}"
     elif config.algo == 'mpc_acados_m':
         if config.algo_config.second_phase.method == "rl":
             filename = f"{datetime.now().strftime('%d_%m')}_trajscal_{config.task_config.task_info.trajectory_scale}_rl_ppo_timed_l4casadi"
