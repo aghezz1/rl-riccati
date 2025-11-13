@@ -14,7 +14,6 @@ import yaml
 with open('examples/mpc/config_overrides/quadrotor_3D/quadrotor_3D_tracking.yaml', 'r') as file:
     config_file_data = yaml.safe_load(file)
 
-breakpoint()
 def latexify_plot() -> None:
     text_usetex = True if shutil.which('latex') else False
     params = {
