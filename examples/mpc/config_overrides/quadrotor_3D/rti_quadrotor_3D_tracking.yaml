@@ -26,6 +26,6 @@ algo_config:
     prior_prop_rand_info: null
   initial_guess_t0:
     initialize: True
-    initialization_type: "policy"  # "tracking_goal", "lqr", "ipopt", "policy"
+    initialization_type: "tracking_goal"  # "tracking_goal", "lqr", "ipopt", "policy"
   use_RTI: True
   initialization: "warm_starting"  # "warm_starting" "shifting" "policy_in_preparation" "warm_starting_1iter"

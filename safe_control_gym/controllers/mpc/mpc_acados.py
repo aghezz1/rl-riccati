@@ -167,6 +167,7 @@ class MPC_ACADOS(MPC):
         sim.model.name = "quadrotor_sim"
         sim.solver_options.T = self.dt
         sim.solver_options.integrator_type = 'ERK'
+        sim.solver_options.sens_forw = False
         self.acados_integrator = AcadosSimSolver(sim)
 
     def setup_acados_optimizer(self):
@@ -244,6 +245,11 @@ class MPC_ACADOS(MPC):
         ocp.solver_options.integrator_type = 'ERK'
         ocp.solver_options.nlp_solver_type = 'SQP' if not self.use_RTI else 'SQP_RTI'
         ocp.solver_options.nlp_solver_max_iter = 100
+        if self.initialization == "warm_starting_1iter":
+            ocp.solver_options.qp_solver_iter_max = 1
+            self.initialization = "warmstarting"
+        # ocp.solver_options.tau_min = 1e-8
+
         if self.compute_initial_guess_method == "policy":
             ocp.solver_options.qp_solver_iter_max = 1
         ocp.solver_options.levenberg_marquardt = 1.
@@ -418,19 +424,12 @@ class MPC_ACADOS(MPC):
         # warm-starting solver
         # NOTE: only for ipopt warm-starting; since acados
         # has a built-in warm-starting mechanism.
-        if self.warmstart:
-            if self.x_guess is None or self.u_guess is None:
-                # compute initial guess with the method specified in 'warmstart_type'
-                self.compute_initial_guess(obs)
-                for idx in range(self.T + 1):
-                    init_x = self.x_guess[:, idx]
-                    self.acados_ocp_solver.set(idx, 'x', init_x)
-                for idx in range(self.T):
-                    if nu == 1:
-                        init_u = np.array([self.u_guess[idx]])
-                    else:
-                        init_u = self.u_guess[:, idx]
-                    self.acados_ocp_solver.set(idx, 'u', init_u)
+        if self.warmstart and (self.x_guess is None or self.u_guess is None):
+            # compute initial guess with the method specified in 'warmstart_type'
+            self.compute_initial_guess(obs)
+            self.acados_ocp_solver.set_flat("x", self.x_guess.T.flatten())
+            self.acados_ocp_solver.set_flat("u", self.u_guess.T.flatten())
+            self.prev_state_1 = self.acados_ocp_solver.get(0, "x")
 
         # set reference for the control horizon
         goal_states = self.get_references()
@@ -457,26 +456,23 @@ class MPC_ACADOS(MPC):
                     self.acados_ocp_solver.set(i, "u", uk_next)
                 self.acados_ocp_solver.set(self.T, "x", xk_next)
             if self.compute_initial_guess_method == "policy":
+                xk = np.zeros((self.T+1, nx))
+                uk = np.zeros((self.T, nu))
                 if self.initialization == "warm_starting":
-                    xk = self.acados_ocp_solver.get(0, "x")
+                    xk[0, :] = self.acados_ocp_solver.get(0, "x")
                     for i in range(self.T):
-                        uk = self.pi_eval(cs.veccat(xk, goal_states[:, i+1]))
-                        xk_next = self.acados_integrator.simulate(xk, uk)
-                        self.acados_ocp_solver.set(i, "u", uk)
-                        self.acados_ocp_solver.set(i+1, "x", xk_next)
-                        xk = xk_next
-                    # self.acados_ocp_solver.set_flat("x", X_flatten) # TODO
-                elif self.initialization == "shifting":  #TODO check the shifting because the results are terrible in comparison to warm_starting
-                    goal_states = self.get_references()
-                    xk = self.acados_ocp_solver.get(i+1, "x")
-                    self.acados_ocp_solver.set(i, "x", xk)
+                        uk[i, :] = self.pi_eval(cs.veccat(xk[i, :], goal_states[:, i+1]))
+                        xk[i+1, :] = self.acados_integrator.simulate(xk[i, :], uk[i, :])
+                    self.acados_ocp_solver.set_flat("x", xk.flatten())
+                    self.acados_ocp_solver.set_flat("u", uk.flatten())
+
+                if self.initialization == "policy_in_preparation":
+                    xk[0, :] = self.prev_state_1
                     for i in range(self.T):
-                        uk = self.pi_eval(cs.veccat(xk, goal_states[:, i+1]))
-                        self.acados_ocp_solver.set(i, "u", uk)
-                        # if i < self.T -1 :
-                        xk_next = self.acados_integrator.simulate(xk, uk)
-                        self.acados_ocp_solver.set(i+1, "x", xk_next)
-                        xk = xk_next
+                        uk[i, :] = self.pi_eval(cs.veccat(xk[i, :], goal_states[:, i+1]))
+                        xk[i+1, :] = self.acados_integrator.simulate(xk[i, :], uk[i, :])
+                    self.acados_ocp_solver.set_flat("x", xk.flatten())
+                    self.acados_ocp_solver.set_flat("u", uk.flatten())
 
         # solve the optimization problem
         if self.use_RTI:
@@ -530,6 +526,8 @@ class MPC_ACADOS(MPC):
         self.results_dict['horizon_states'].append(deepcopy(self.x_prev))
         self.results_dict['horizon_inputs'].append(deepcopy(self.u_prev))
         self.results_dict['goal_states'].append(deepcopy(goal_states))
+
+        self.prev_state_1 =  self.acados_ocp_solver.get(1, 'x')
 
         self.prev_action = action
         if self.use_lqr_gain_and_terminal_cost:

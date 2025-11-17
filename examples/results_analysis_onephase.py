@@ -47,22 +47,20 @@ class Results:
 
 DATA_DIR = 'examples/mpc/temp-data'
 FIGURE_DIR = 'figures/results'
-DATE = '13_11'
+DATE = '17_11'
 
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 
-def get_main_stats(name, METHOD, RTI, CONDESING, RL=False, snd_phase=False, **kwargs):
+def get_main_stats(name, METHOD, RTI, RL=False, prefix="", **kwargs):
     mydict = {}
     for k, v in kwargs.items():
         mydict.update({k: v})
 
     if RL:
-        FILENAME = f'{DATE}_trajscal_{mydict["traj_scaling"]}_rl_ppo_timed_l4casadi_data_quadrotor_traj_tracking.pkl'
+        FILENAME = f'{prefix}{DATE}_trajscal_{mydict["traj_scaling"]}_rl_ppo_timed_l4casadi_data_quadrotor_traj_tracking.pkl'
     else:
-        FILENAME = f'{DATE}_trajscal_{mydict["traj_scaling"]}_{METHOD}_N{mydict["N"]}_RTI_{RTI}_init_{mydict["initialization"]}_with_warm_starting_data_quadrotor_traj_tracking.pkl'
-    if snd_phase:
-        FILENAME = f'{DATE}_trajscal_{mydict["traj_scaling"]}_{METHOD}_M{mydict["M"]}N{mydict["N"]}_RTI_{RTI}_sndphase_{snd_phase}_init_{mydict["initialization"]}_initpept_{mydict["initialization_pept"]}_barrier_{mydict["barrier_parameter"]}_condensed_{CONDESING}_data_quadrotor_traj_tracking.pkl'
+        FILENAME = f'{prefix}{DATE}_trajscal_{mydict["traj_scaling"]}_{METHOD}_N{mydict["N"]}_RTI_{RTI}_init_{mydict["initialization"]}_with_{mydict["warmstarting"]}_data_quadrotor_traj_tracking.pkl'
 
     path = os.path.join(DATA_DIR, FILENAME)
 
@@ -133,22 +131,26 @@ def get_main_stats(name, METHOD, RTI, CONDESING, RL=False, snd_phase=False, **kw
 
     return res
 
-if __name__ == "__main__":
 
-    TRAJ_SCALING = 1  # 0.8, 1
-    N = 20
+def load_trajectories(prefix: str):
+    TRAJ_SCALING = 1
+    N = 40
 
     results = []
     kwargs = {}
     kwargs.update({"traj_scaling": TRAJ_SCALING, "N": N,})
     kwargs.update({"initialization": "tracking_goal"})
+    kwargs.update({"warmstarting": "warm_starting"})
 
     kwargs.update({"N": 40})
-    results.append(get_main_stats("SQP-40", "acados", False, False, **kwargs))
-    results.append(get_main_stats("RTI-40", "acados", True, False, **kwargs))
+    # results.append(get_main_stats("SQP-40", "acados", False, False, prefix=prefix, **kwargs))
+    results.append(get_main_stats("RTI", "acados", True, False, prefix=prefix, **kwargs))
+    kwargs.update({"warmstarting": "warm_starting_1iter"})
+    results.append(get_main_stats("Riccati-RTI", "acados", True, False, prefix=prefix, **kwargs))
     kwargs.update({"initialization": "policy"})
-    results.append(get_main_stats("Riccati-RL-40", "acados", True, False, **kwargs))
-    results.append(get_main_stats("PPO-RL", "rl", False, False, RL=True, **kwargs))
+    kwargs.update({"warmstarting": "warm_starting"})
+    results.append(get_main_stats("Riccati-RL", "acados", True, False, prefix=prefix, **kwargs))
+    results.append(get_main_stats("PPO-RL", "rl", False, RL=True, prefix=prefix, **kwargs))
     state_ref = np.load(f"{DATA_DIR}" + f"/state_ref_scaling_{TRAJ_SCALING}.npy")
 
 
@@ -171,25 +173,34 @@ if __name__ == "__main__":
 
     labels = [l.name for l in results]
     plot_labels = labels
-
-
-    # Print average runtime
-    print("Average total runtime in milliseconds:")
-    [print(l.name, np.round(np.array(t_sel_tot(l)).mean()*1e3, 2)) for l in (results)]
-    print("Average feedback runtime in milliseconds:")
-    [print(l.name, np.round(np.array(t_sel_feed(l)).mean()*1e3, 2)) for l in (results)]
-
     # # Plot state trajectories (many trajectories shadowed)
     total_reward = lambda x : [-np.nanmean(r) if s == True else 9999 for r, s in zip(x.reward, is_success)]
     total_const = lambda x : [np.nanmean(r) if s == True else 9999 for r, s in zip(x.cost_cns_viol, is_success)]
+
+    # Print average runtime
+    stats = {"mean_runtime": [], "max_runtime": [], "mean_feedback_time": [], "max_feedback_time": [], "tracking_cost": [], "violation_cost": []}
+    stats["mean_runtime"] = [np.round(np.array(t_sel_tot(l)).mean()*1e3, 2) for l in (results)]
+    stats["max_runtime"] = [np.round(np.array(t_sel_tot(l)).max()*1e3, 2) for l in (results)]
+    stats["mean_feedback_time"] = [np.round(np.array(t_sel_feed(l)).mean()*1e3, 2) for l in (results)]
+    stats["max_feedback_time"] = [np.round(np.array(t_sel_feed(l)).max()*1e3, 2) for l in (results)]
+    stats["tracking_cost"] = [np.round(np.array(total_reward(l)), 4) for l in (results)]
+    stats["violation_cost"] = [np.round(np.array(total_const(l)), 4) for l in (results)]
 
     idx_max_viol_clc = np.argmin(total_reward(results[0]))
     # [print(f"reward {r.name} : {total_reward(r)[idx_max_viol_clc]}") for r in results]
     state_list = [r.state_list[idx_max_viol_clc] for r in results]
     control_list = [r.control_list[idx_max_viol_clc] for r in results]
 
+    return state_list, control_list, plot_labels, state_ref, stats
+
+
+
+if __name__ == "__main__":
+
     nx = 12
     nu = 4
+    dt = 1/config_file_data['task_config']['ctrl_freq']
+
     state_lb = config_file_data['task_config']['constraints'][0]['lower_bounds']
     state_ub = config_file_data['task_config']['constraints'][0]['upper_bounds']
     control_lb = config_file_data['task_config']['constraints'][1]['lower_bounds']
@@ -197,16 +208,38 @@ if __name__ == "__main__":
     control_ref = np.array([0.06615, 0.06615, 0.06615, 0.06615])
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
+    tot_stats = {"mean_runtime": [], "max_runtime": [], "mean_feedback_time": [], "max_feedback_time": [], "tracking_cost": [], "violation_cost": []}
+    for i in range(3):
+        state_list, control_list, plot_labels, state_ref, stats = load_trajectories(f"p{i}_")
+        tot_stats["mean_runtime"].append(stats["mean_runtime"])
+        tot_stats["max_runtime"].append(stats["max_runtime"])
+        tot_stats["mean_feedback_time"].append(stats["mean_feedback_time"])
+        tot_stats["max_feedback_time"].append(stats["max_feedback_time"])
+        tot_stats["tracking_cost"].append(stats["tracking_cost"])
+        tot_stats["violation_cost"].append(stats["violation_cost"])
+
+    print(f"{plot_labels}")
+    print(f"mean runtime (ms): {np.array(tot_stats['mean_runtime']).mean(axis=0).round(2)}")
+    print(f"max runtime (ms): {np.array(tot_stats['max_runtime']).max(axis=0).round(2)}")
+    print(f"feedback mean runtime (ms): {np.nanmean(np.array(tot_stats['mean_feedback_time']), axis=0).round(2)}")
+    print(f"max feedback runtime (ms): {np.nanmax(np.array(tot_stats['max_feedback_time']), axis=0).round(2)}")
+    print(f"mean tracking cost:\n {np.array(tot_stats['tracking_cost']).squeeze().round(4)}")
+    print(f"mean violation cost:\n {np.array(tot_stats['violation_cost']).squeeze().round(4)}")
+
+    breakpoint()
+
     def plot_position_projections(axs, state_traj, title, ylabel=False):
         # Position-Velocity Projection XZ, YZ
-        axs[0].plot(np.array(state_traj).T[0, :-1], np.array(state_traj).T[4, :-1], marker="", alpha=0.9, linewidth=2)
+        axs[0].plot(np.array(state_traj).T[0, 0], np.array(state_traj).T[4, 0], marker=".", alpha=1, color="tab:blue")
+        axs[0].plot(np.array(state_traj).T[0, :-1], np.array(state_traj).T[4, :-1], marker="", linewidth=1, alpha=0.5, color="tab:blue")
         axs[0].plot(np.array(state_ref).T[0, :-1], np.array(state_ref).T[4, :-1], color='k', linestyle=':', alpha=0.3,)
         if ylabel:
             axs[0].set_ylabel('$p^\mathrm{z}$ (m)', fontsize=8)
         axs[0].set_xlabel('$p^\mathrm{x}$ (m)', fontsize=8, labelpad=0.5)
         axs[0].set_xlim(-1.3, 1.3)
 
-        axs[1].plot(np.array(state_traj).T[2, :-1], np.array(state_traj).T[4, :-1], marker="", alpha=0.9, linewidth=2)
+        axs[1].plot(np.array(state_traj).T[2, 0], np.array(state_traj).T[4, 0], marker=".", alpha=1, color="tab:blue")
+        axs[1].plot(np.array(state_traj).T[2, :-1], np.array(state_traj).T[4, :-1], marker="", linewidth=1, alpha=0.5, color="tab:blue")
         axs[1].plot(np.array(state_ref).T[2, :-1], np.array(state_ref).T[4, :-1], color='k', linestyle=':', alpha=0.3,)
         if ylabel:
             axs[1].set_ylabel('$p^\mathrm{z}$ (m)', fontsize=8)
@@ -214,16 +247,14 @@ if __name__ == "__main__":
         axs[1].set_xlim(-0.6, 0.1)
         fig.align_ylabels(axs)
         axs[0].set_title(title, fontsize=8, pad=0.5)
-        # legend = fig.legend(plot_labels, ncols=3, loc="upper center", bbox_to_anchor=(0.5, 1.01),
-                            # frameon=False, fontsize=7, handlelength=0.8)
-        # fig.subplots_adjust(left=0.24, bottom=0.18, hspace=0.6)
-        # fig.tight_layout()
 
     fig, axs = plt.subplots(2, 4, figsize=(8, 2.3), sharey=True)
-    plot_position_projections(axs[:, 0], state_list[0], plot_labels[0], ylabel=True)
-    plot_position_projections(axs[:, 1], state_list[1], plot_labels[1])
-    plot_position_projections(axs[:, 2], state_list[2], plot_labels[2])
-    plot_position_projections(axs[:, 3], state_list[3], plot_labels[3])
+    for i in range(3):
+        state_list, control_list, _, _, _ = load_trajectories(f"p{i}_")
+        plot_position_projections(axs[:, 0], state_list[0], plot_labels[0], ylabel=True)
+        plot_position_projections(axs[:, 1], state_list[1], plot_labels[1])
+        plot_position_projections(axs[:, 2], state_list[2], plot_labels[2])
+        plot_position_projections(axs[:, 3], state_list[3], plot_labels[3])
 
     for a in axs.flatten():
         a.tick_params(axis="y",direction="in",)
@@ -234,19 +265,16 @@ if __name__ == "__main__":
     fig.savefig(os.path.join(FIGURE_DIR, f"pos_projections.pdf"), bbox_inches="tight", pad_inches=0.05)
 
     def plot_velocity_projections(axs, state_traj, title, ylabel=False):
-        dt = 0.05
         time_array = np.arange(0, state_traj.shape[0]-1) * dt
         # Position-Velocity Projection XZ, YZ
-        axs[0].plot(time_array, np.array(state_traj).T[1, :-1], marker="", alpha=0.9, linewidth=2)
+        axs[0].plot(time_array, np.array(state_traj).T[1, :-1], marker="", linewidth=1, alpha=0.5, color="tab:blue")
         axs[0].plot(time_array, np.array(state_ref).T[1, :-1], color='k', linestyle=':', alpha=0.3,)
         if ylabel:
             axs[0].set_ylabel('$v^\mathrm{x}$ (m)', fontsize=8)
         axs[0].axhline(state_lb[1], color='r', linestyle="--")
         axs[0].axhline(state_ub[1], color='r', linestyle="--")
-        # axs[0].set_xlabel('$t$ (sec)', fontsize=8, labelpad=0.5)
-        # axs[0].set_xlim(-1.3, 1.3)
 
-        axs[1].plot(time_array, np.array(state_traj).T[5, :-1], marker="", alpha=0.9, linewidth=2)
+        axs[1].plot(time_array, np.array(state_traj).T[5, :-1], marker="", linewidth=1, alpha=0.5, color="tab:blue")
         axs[1].plot(time_array, np.array(state_ref).T[5, :-1], color='k', linestyle=':', alpha=0.3,)
         if ylabel:
             axs[1].set_ylabel('$v^\mathrm{z}$ (m)', fontsize=8)
@@ -257,16 +285,14 @@ if __name__ == "__main__":
 
         fig.align_ylabels(axs)
         axs[0].set_title(title, fontsize=8, pad=0.5)
-        # legend = fig.legend(plot_labels, ncols=3, loc="upper center", bbox_to_anchor=(0.5, 1.01),
-                            # frameon=False, fontsize=7, handlelength=0.8)
-        # fig.subplots_adjust(left=0.24, bottom=0.18, hspace=0.6)
-        # fig.tight_layout()
 
     fig, axs = plt.subplots(2, 4, figsize=(8, 2.3), sharey=True, sharex=True)
-    plot_velocity_projections(axs[:, 0], state_list[0], plot_labels[0], ylabel=True)
-    plot_velocity_projections(axs[:, 1], state_list[1], plot_labels[1])
-    plot_velocity_projections(axs[:, 2], state_list[2], plot_labels[2])
-    plot_velocity_projections(axs[:, 3], state_list[3], plot_labels[3])
+    for i in range(3):
+        state_list, control_list, _, _, _ = load_trajectories(f"p{i}_")
+        plot_velocity_projections(axs[:, 0], state_list[0], plot_labels[0], ylabel=True)
+        plot_velocity_projections(axs[:, 1], state_list[1], plot_labels[1])
+        plot_velocity_projections(axs[:, 2], state_list[2], plot_labels[2])
+        plot_velocity_projections(axs[:, 3], state_list[3], plot_labels[3])
 
     for a in axs.flatten():
         a.tick_params(axis="y",direction="in",)
