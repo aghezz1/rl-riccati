@@ -1,22 +1,22 @@
-# PEPT: policy-enhanced partially-tightened MPC
-This repo is linked with the [paper](http://arxiv.org/abs/2504.02710) (*submitted for publication*) where we propose policy-enhanced partial tightening (PEPT) an efficient method to enhance model predictive control with a reinforcement learning policy.
+# Riccati-RL: Refining Learned Policy Rollouts via a Single Riccati Recursion in Real-Time Iteration Model Predictive Control
+This repo is linked with the [paper] (*submitted for publication*) where we propose to compute a single Newton step over the rollout obtained via a learned policy.
 
-Goal of this repo is to illustrate how to efficiently implement advanced MPC schemes using [`acados`](https://github.com/acados/acados) and its [novel multiphase framework](https://onlinelibrary.wiley.com/doi/pdf/10.1002/oca.3234) .
-We implement
-- policy-enhanced partial tightening (PEPT)
-- closed-loop costing (CLC)
-- partial tightening (PT)
+The repo contains the code to reproduce the example contained in the paper.
+The example is constructed within [`safe-control-gym`](https://github.com/utiasDSL/safe-control-gym) and consists of tracking a lemniscate with a nonlinear 3D quadcopter.
+We adopt as learned policy the PPO policy the one available in the `safe-control-gym` library.
+Installation instructions are provided below.
 
-The methods are validated using [`safe-control-gym`](https://github.com/utiasDSL/safe-control-gym) on the 3D quadcopter tracking a lemniscate.
-Both CLC and PEPT make use of the trained PPO policy available in the `safe-control-gym` library.
-In the comparison among the MPC-based approaches we also include the pure RL policy.
+## Usage
+After installation, to run the simulations in the paper need move to `cd examples/mpc` and execute `./ecc_sub_experiments.sh` \
+To reproduce the plots, from the root folder, run the python script `python examples/results_analysis_onephase.py` \
+_Note:_ you might need to edit the parameter `DATE` inside `results_analysis_onephase.py` since the results are saved by date
 
 ## Install on Ubuntu/macOS
 
 ### Clone repo
 
 ```bash
-git clone https://github.com/aghezz1/pept
+git clone https://github.com/aghezz1/rl-riccati
 cd pept
 ```
 
@@ -67,33 +67,4 @@ You need to separately install [`acados`](https://github.com/acados/acados) (>= 
   python -m pip install -e PATH_TO_ACADOS_DIR/interfaces/acados_template
   ```
 
-
-## Usage
-The developed code is limited to the files `**/mpc_acados_**`, `example/results_analysis.py`
-
-The workflow to run a simulation is the following:
-1) open `examples/mpc/mpc_experiment.sh`check that the field `ALGO` is set to `mpc_acados` or `mpc_acados_m`, the latter is for running the multiphase formulations
-2) if you want to run multiple episodes or save data or show a gui modify the header of function `run` in `examples/mpc/mpc_experiment.py`
-3) according to which `ALGO` you set, open the yaml file `mpc_acados_quadrotor_3D_tracking.yaml` (or `mpc_acados_m_quadrotor_3D_tracking.yaml`) contained in `examples/mpc/config_overrides/quadrotor_3D`, here you can change the hyperparameter of your MPC controller (horizon length, cost weights, toggle RTI, change initialization strategy, change method for the second phase, ...)
-4) in your shell execute `./mpc_experiment.sh`
-
-- If you store results and want to reproduce the figures in the paper, open `example/results_analysis.py`, edit the parameters and execute the file
-
-- To change the scaling factor of the lemniscate (as done in the paper to make the tracking task harder), open `quadrotor_3D_tracking.yaml` in the folder `examples/mpc/config_overrides/quadrotor_3D` and modify the parameter `trajectory_scale`
-
-## References
-```
-@misc{Ghezzi2025a,
-      title={A Numerically Efficient Method to Enhance Model Predictive Control Performance with a Reinforcement Learning Policy},
-      author={Andrea Ghezzi and Rudolf Reiter and Katrin Baumgärtner and Alberto Bemporad and Moritz Diehl},
-      year={2025},
-      eprint={2504.02710},
-      archivePrefix={arXiv},
-      primaryClass={math.OC},
-      url={https://arxiv.org/abs/2504.02710},
-}
-```
-
-## Bug reporting / contributions
-They are welcome via PR
 
