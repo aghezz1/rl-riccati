@@ -248,12 +248,16 @@ class MPC_ACADOS(MPC):
         if self.initialization == "warm_starting_1iter":
             ocp.solver_options.qp_solver_iter_max = 1
             self.initialization = "warmstarting"
-        # ocp.solver_options.tau_min = 1e-8
+
+        # Warm-start options
+        ocp.solver_options.qp_solver_warm_start = 2
+        ocp.solver_options.nlp_solver_warm_start_first_qp = True
+        ocp.solver_options.nlp_solver_warm_start_first_qp_from_nlp = True
 
         if self.compute_initial_guess_method == "policy":
             ocp.solver_options.qp_solver_iter_max = 1
         ocp.solver_options.levenberg_marquardt = 1.
-        # ocp.solver_options.print_level = 1
+        ocp.solver_options.print_level = 0
         if not self.use_RTI:
             ocp.solver_options.globalization = 'FUNNEL_L1PEN_LINESEARCH'  # 'MERIT_BACKTRACKING'
         ocp.solver_options.tf = self.T * self.dt  # prediction horizon

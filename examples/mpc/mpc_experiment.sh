@@ -20,9 +20,11 @@ else
     SYS_NAME='quadrotor'
 fi
 
+CONFIG='riccati_rti'  # riccati_rl  riccati_rti, rti
+
 python3 ./mpc_experiment.py \
     --task ${SYS_NAME} \
     --algo ${ALGO} \
     --overrides \
         ./config_overrides/${SYS}/${SYS}_${TASK}.yaml \
-        ./config_overrides/${SYS}/${ALGO}_${SYS}_${TASK}.yaml
+        ./config_overrides/${SYS}/${CONFIG}_${SYS}_${TASK}.yaml

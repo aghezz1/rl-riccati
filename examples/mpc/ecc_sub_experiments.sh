@@ -6,8 +6,6 @@ TASK='tracking'
 SYS_NAME='quadrotor'
 
 # Run PPO-RL
-
-
 ALGO='mpc_acados_m'
 python3 ./ecc_sub_experiments.py \
     --task ${SYS_NAME} \
