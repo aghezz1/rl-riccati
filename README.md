@@ -1,5 +1,5 @@
 # Rollout Then Optimize: A One-Step Newton Refinement of Learned Policies for Nonlinear Model Predictive Control
-This repo is linked with the [paper] (*submitted for publication*) where we propose to compute a single Newton step over the rollout obtained via a learned policy.
+This repo is linked with the [paper] (*to appear at ECC26*) where we propose to compute a single Newton step over the rollout obtained via a learned policy.
 
 The repo contains the code to reproduce the example contained in the paper.
 The example is constructed within [`safe-control-gym`](https://github.com/utiasDSL/safe-control-gym) and consists of tracking a lemniscate with a nonlinear 3D quadcopter.
