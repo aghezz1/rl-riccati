@@ -6,8 +6,12 @@ The example is constructed within [`safe-control-gym`](https://github.com/utiasD
 We adopt as learned policy the PPO policy the one available in the `safe-control-gym` library.
 Installation instructions are provided below.
 
-![alt text](https://github.com/aghezz1/rl-riccati/blob/resub/figures/pos_projections.png)
-![alt text](https://github.com/aghezz1/rl-riccati/blob/resub/figures/vel_x_z_subplots.png)
+<p float="left">
+  <img src="figures/pos_projections.png" width="600" />
+</p>
+<p float="left">
+  <img src="figures/vel_x_z_subplots.png" width="600" />
+</p>
 <p float="left">
   <img src="figures/cost_comparison.png" width="400" />
   <img src="figures/runtime_comparison.png" width="400" />
